@@ -8,28 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
 
-/**
- * EventAlarmReceiver — يستقبل trigger من AlarmManager عند وقت الحدث.
- *
- * مسار التنفيذ الصحيح على Android 14+ / One UI 8:
- * ────────────────────────────────────────────────
- * 1. AlarmManager (setAlarmClock) → broadcast هنا
- * 2. هذا الـ Receiver يبني Notification بـ FullScreenIntent
- * 3. النظام (وليس التطبيق) يقرر إطلاق AlarmOverlayActivity
- *    لأن:
- *    - القناة بـ USAGE_ALARM (تُصنّف "alarm" حقيقي)
- *    - Notification بـ CATEGORY_ALARM + PRIORITY_MAX
- *    - FullScreenIntent مع PendingIntent.getActivity
- *    - canUseFullScreenIntent مفعّل من Settings
- *
- * هذا النهج يحترم قيود Android 14/15/16 ولا يحاول
- * استدعاء startActivity من background (الذي محجوب).
- */
 class EventAlarmReceiver : BroadcastReceiver() {
 
     companion object {
-        // استخدم قناة v3 الجديدة (بـ USAGE_ALARM)
-        val CHANNEL_ID get() = CalendarAlarmApplication.CHANNEL_ID_ALARM_V3
+        // ⭐ القناة v4 الجديدة — صامتة
+        val CHANNEL_ID get() = CalendarAlarmApplication.CHANNEL_ID_ALARM_V4
         const val NOTIF_ID_BASE = 9000
     }
 
@@ -43,17 +26,11 @@ class EventAlarmReceiver : BroadcastReceiver() {
         if (eventId < 0 || title.isBlank()) return
         if (PendingAlarmsStore.isDismissed(context, eventId)) return
 
-        // PARTIAL_WAKE_LOCK يكفي — يبقي المعالج صاحياً حتى يكتمل onReceive
-        // (إيقاظ الشاشة مهمة النظام عبر FSI، ليس هذا الـ wakelock)
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val wl = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "CalendarAlarm::ReceiverWakeLock"
-        )
+        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "CalendarAlarm::ReceiverWakeLock")
         wl.acquire(10_000L)
 
         try {
-            // PendingIntent للـ AlarmOverlayActivity (يطلقه النظام تلقائياً عبر FSI)
             val overlayIntent = Intent(context, AlarmOverlayActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -74,21 +51,19 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            // PendingIntent للضغط على الإشعار (نفس الـ overlay)
             val contentPi = PendingIntent.getActivity(
                 context, eventId.toInt() + 100_000, overlayIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            // بناء Notification بكل الـ flags الحرجة لـ FSI ليطلق Activity
             val notification = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)
                 .setContentText(if (isTask) "✅ مهمة" else "📅 تقويم")
-                .setCategory(Notification.CATEGORY_ALARM)        // ← CATEGORY ALARM
-                .setVisibility(Notification.VISIBILITY_PUBLIC)   // ← يظهر على lock screen
-                .setPriority(Notification.PRIORITY_MAX)          // ← أعلى أولوية
-                .setFullScreenIntent(fullScreenPi, true)         // ← المفتاح: true = highPriority
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setPriority(Notification.PRIORITY_MAX)
+                .setFullScreenIntent(fullScreenPi, true)
                 .setContentIntent(contentPi)
                 .setAutoCancel(false)
                 .setOngoing(true)
@@ -96,8 +71,8 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 .setWhen(startTime)
                 .build()
 
-            // FLAG_INSISTENT = الصوت يستمر حتى يتفاعل المستخدم
-            notification.flags = notification.flags or Notification.FLAG_INSISTENT
+            // ⭐ ما نضيف FLAG_INSISTENT — يخلي القناة تعيد الصوت بدون توقف
+            // الصوت يُشغّل مرة واحدة من AlarmOverlayActivity
 
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.notify(NOTIF_ID_BASE + eventId.toInt(), notification)
