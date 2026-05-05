@@ -3,6 +3,8 @@ package com.alaimtiaz.calendaralarm
 import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -23,8 +25,16 @@ import java.util.Locale
 
 /**
  * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
- * الصوت يأتي من القناة (NotificationChannel) وليس من هنا.
- * هذا يضمن صوت واحد فقط بدون تكرار.
+ *
+ * ━━━ الإصلاحات في هذا الإصدار ━━━
+ * 1. الصوت يشتغل مرة وحدة فقط (isLooping = false)
+ * 2. المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
+ * 3. الاختبار اليدوي → الصوت من MediaPlayer (للاختبار)
+ * 4. لا اهتزاز
+ *
+ * كيف نميّز بين الاختبار والمنبه الحقيقي؟
+ * - الاختبار اليدوي → eventId = 99999L أو 99998L → نشغّل MediaPlayer
+ * - المنبه الحقيقي → eventId مختلف → الصوت من القناة (لا نلمسه)
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -36,10 +46,14 @@ class AlarmOverlayActivity : AppCompatActivity() {
         const val EXTRA_IS_TASK     = "event_is_task"
         const val EXTRA_START_TIME  = "event_start_time"
         const val EXTRA_NOTIF_KEY   = "notif_key"
+        // معرّفات الاختبار اليدوي فقط
+        private const val TEST_ALARM_ID = 99999L
+        private const val TEST_TASK_ID  = 99998L
         private val SNOOZE_LABELS  = listOf("تأجيل متقدم ▾","ساعتان","4 ساعات","8 ساعات","يوم كامل","أسبوع")
         private val SNOOZE_MINUTES = listOf(0L, 120L, 240L, 480L, 1440L, 10080L)
     }
 
+    private var mediaPlayer: MediaPlayer? = null
     private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
@@ -65,7 +79,13 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
+        // الصوت فقط في حالة الاختبار اليدوي
+        if (isTestAlarm()) {
+            playAlarmSound()
+        }
     }
+
+    private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -107,6 +127,8 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setIntent(intent)
         loadExtras(intent)
         setupUI()
+        stopSound()
+        if (isTestAlarm()) playAlarmSound()
     }
 
     private fun loadExtras(intent: Intent) {
@@ -196,17 +218,44 @@ class AlarmOverlayActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * تشغيل النغمة (للاختبار اليدوي فقط) — مرة واحدة فقط.
+     */
+    private fun playAlarmSound() {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE)
+        val soundUri = prefs.getString(MainActivity.KEY_SOUND_URI, null)?.let { Uri.parse(it) }
+            ?: android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@AlarmOverlayActivity, soundUri)
+                isLooping = false   // ⭐ مرة واحدة فقط
+                prepare()
+                start()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun stopSound() {
+        try { mediaPlayer?.stop() } catch (_: Exception) {}
+        try { mediaPlayer?.release() } catch (_: Exception) {}
+        mediaPlayer = null
+    }
+
     private fun stopEverythingAndFinish() {
+        stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
-        try {
-            getSystemService(NotificationManager::class.java)
-                .cancel(EventAlarmReceiver.NOTIF_ID_BASE + eventId.toInt())
-        } catch (_: Exception) {}
         finish()
     }
 
     override fun onDestroy() {
+        stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
         super.onDestroy()
