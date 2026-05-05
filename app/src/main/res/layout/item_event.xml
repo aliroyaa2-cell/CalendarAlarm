@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:background="#1C1F2E"
+    android:layout_marginBottom="6dp" android:paddingVertical="12dp"
+    android:paddingHorizontal="14dp" android:layoutDirection="rtl">
+    <View android:id="@+id/viewItemBar"
+        android:layout_width="4dp" android:layout_height="match_parent"
+        android:layout_marginEnd="12dp" android:background="#5B6EF5" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/tvItemType"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textColor="#FFFFFF"
+            android:paddingHorizontal="8dp" android:paddingVertical="2dp"
+            android:layout_marginBottom="4dp" android:background="#5B6EF5" />
+        <TextView android:id="@+id/tvItemTitle"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="15sp" android:textColor="#FFFFFF"
+            android:textStyle="bold" android:paddingBottom="4dp" />
+        <TextView android:id="@+id/tvItemTime"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="12sp" android:textColor="#9099B5" />
+    </LinearLayout>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical" android:text="&#8592;"
+        android:textSize="16sp" android:textColor="#444444" />
+</LinearLayout>

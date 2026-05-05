@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ━━━ Permissions الأساسية ━━━ -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- ━━━ Foreground Service (للـ Observer فقط) ━━━ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- ━━━ احتياط Battery + Overlay ━━━ -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:name=".CalendarAlarmApplication"
+        android:allowBackup="true"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CalendarAlarm">
+
+        <!-- ━━━ Activities ━━━ -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            AlarmOverlayActivity:
+            - showOnLockScreen + turnScreenOn = تطلب من النظام عرضها على lock screen
+            - launchMode singleTop = تجنّب نسخ متعددة
+            - excludeFromRecents = لا تظهر في recent apps
+            - taskAffinity فارغ = task مستقلة (مهم لـ FSI)
+            - showForAllUsers = مهم لـ Samsung One UI لتشغيل من lock screen
+        -->
+        <activity
+            android:name=".AlarmOverlayActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:showForAllUsers="true"
+            android:theme="@style/Theme.CalendarAlarm.Overlay" />
+
+        <!-- ━━━ Receivers ━━━ -->
+        <receiver
+            android:name=".EventAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ━━━ Services ━━━ -->
+        <!-- Service يراقب التقويم في الخلفية -->
+        <service
+            android:name=".CalendarObserverService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!--
+            ملاحظة: AlarmForegroundService تم حذفه — كان كود ميت ولم يُستدعَ.
+            مسار التنفيذ الصحيح الآن:
+            AlarmManager.setAlarmClock → EventAlarmReceiver → Notification(FSI)
+            → النظام يطلق AlarmOverlayActivity تلقائياً
+        -->
+
+        <!-- Notification Listener للمهام (قراءة Google Tasks) -->
+        <service
+            android:name=".TasksNotificationListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="#0F1117" android:layoutDirection="rtl">
+
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="منبّه التقويم" android:textSize="22sp" android:textStyle="bold"
+        android:textColor="#FFFFFF" android:gravity="center"
+        android:paddingTop="20dp" android:paddingBottom="16dp" />
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingBottom="32dp">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="الصلاحيات المطلوبة" android:textSize="14sp"
+                android:textColor="#9099B5" android:paddingBottom="8dp" />
+
+            <androidx.cardview.widget.CardView android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#1C1F2E" app:cardCornerRadius="14dp" app:cardElevation="0dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:id="@+id/tvStatusCalendar" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="13sp" android:paddingBottom="4dp" />
+                    <Button android:id="@+id/btnGrantCalendar" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="منح صلاحية التقويم"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#5B6EF5" android:layout_marginBottom="10dp" />
+
+                    <TextView android:id="@+id/tvStatusNotif" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="13sp" android:paddingBottom="4dp" />
+                    <Button android:id="@+id/btnGrantNotif" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="منح صلاحية الإشعارات"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#5B6EF5" android:layout_marginBottom="10dp" />
+
+                    <TextView android:id="@+id/tvStatusExact" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="13sp" android:paddingBottom="4dp" />
+                    <Button android:id="@+id/btnGrantExactAlarm" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="السماح بالجدولة الدقيقة"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#5B6EF5" android:layout_marginBottom="10dp" />
+
+                    <TextView android:id="@+id/tvStatusFull" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="13sp" android:paddingBottom="4dp" />
+                    <Button android:id="@+id/btnGrantFullScreen" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="السماح بالشاشة الكاملة"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#5B6EF5" android:layout_marginBottom="10dp" />
+
+                    <TextView android:id="@+id/tvStatusListener" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="13sp" android:paddingBottom="4dp" />
+                    <Button android:id="@+id/btnGrantNotifListener" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="تفعيل قراءة الإشعارات للمهام"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#5B6EF5" android:layout_marginBottom="10dp" />
+
+                    <Button android:id="@+id/btnGrantBattery" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="إيقاف توفير البطارية"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#E67E22"
+                        android:layout_marginBottom="10dp" />
+
+                    <Button android:id="@+id/btnGrantOverlay" android:layout_width="match_parent"
+                        android:layout_height="40dp" android:text="⭐ الظهور فوق التطبيقات (مهم)"
+                        android:textSize="13sp" android:textColor="#FFFFFF"
+                        android:backgroundTint="#8E44AD" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#1C1F2E" app:cardCornerRadius="14dp" app:cardElevation="0dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="14dp">
+                    <TextView android:id="@+id/tvSoundName" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:textSize="14sp"
+                        android:textColor="#9099B5" android:paddingBottom="10dp" />
+                    <Button android:id="@+id/btnPickSound" android:layout_width="match_parent"
+                        android:layout_height="44dp" android:text="اختر النغمة"
+                        android:textColor="#FFFFFF" android:backgroundTint="#5B6EF5" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="20dp">
+                <Button android:id="@+id/btnTest" android:layout_width="0dp"
+                    android:layout_height="48dp" android:layout_weight="1"
+                    android:layout_marginEnd="6dp" android:text="اختبار تقويم"
+                    android:textSize="13sp" android:textColor="#FFFFFF" android:backgroundTint="#27AE60" />
+                <Button android:id="@+id/btnTestTask" android:layout_width="0dp"
+                    android:layout_height="48dp" android:layout_weight="1"
+                    android:layout_marginStart="6dp" android:text="اختبار مهمة"
+                    android:textSize="13sp" android:textColor="#FFFFFF" android:backgroundTint="#1B6B3A" />
+            </LinearLayout>
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="الأحداث والمهام" android:textSize="14sp"
+                android:textColor="#9099B5" android:paddingBottom="8dp" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:background="#1C1F2E"
+                android:padding="10dp" android:layout_marginBottom="8dp">
+                <EditText android:id="@+id/etSearch" android:layout_width="0dp"
+                    android:layout_height="wrap_content" android:layout_weight="1"
+                    android:hint="ابحث في جميع الأحداث..." android:textColorHint="#9099B5"
+                    android:textColor="#FFFFFF" android:background="@null"
+                    android:textSize="14sp" android:imeOptions="actionSearch" android:inputType="text" />
+                <ImageButton android:id="@+id/btnClearSearch" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:background="@null" android:padding="4dp" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:background="#1C1F2E"
+                android:padding="4dp" android:layout_marginBottom="8dp">
+                <Button android:id="@+id/btnTabUpcoming" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="القادمة" android:textSize="13sp"
+                    android:textColor="#FFFFFF" android:backgroundTint="#5B6EF5" />
+                <Button android:id="@+id/btnTabPast" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="السابقة" android:textSize="13sp"
+                    android:textColor="#9099B5" android:backgroundTint="#1C1F2E" />
+            </LinearLayout>
+
+            <TextView android:id="@+id/tvEmpty" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="لا توجد أحداث"
+                android:textSize="14sp" android:textColor="#9099B5"
+                android:gravity="center" android:padding="20dp" android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvEvents"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
