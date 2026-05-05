@@ -26,15 +26,11 @@ import java.util.Locale
 /**
  * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
  *
- * ━━━ الإصلاحات في هذا الإصدار ━━━
- * 1. الصوت يشتغل مرة وحدة فقط (isLooping = false)
- * 2. المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
- * 3. الاختبار اليدوي → الصوت من MediaPlayer (للاختبار)
- * 4. لا اهتزاز
+ * ━━━ الإصلاح الأخير ━━━
+ * المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
+ * الاختبار اليدوي → الصوت من MediaPlayer (مرة وحدة)
  *
- * كيف نميّز بين الاختبار والمنبه الحقيقي؟
- * - الاختبار اليدوي → eventId = 99999L أو 99998L → نشغّل MediaPlayer
- * - المنبه الحقيقي → eventId مختلف → الصوت من القناة (لا نلمسه)
+ * النتيجة: صوت واحد فقط في كل الحالات.
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -46,7 +42,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         const val EXTRA_IS_TASK     = "event_is_task"
         const val EXTRA_START_TIME  = "event_start_time"
         const val EXTRA_NOTIF_KEY   = "notif_key"
-        // معرّفات الاختبار اليدوي فقط
         private const val TEST_ALARM_ID = 99999L
         private const val TEST_TASK_ID  = 99998L
         private val SNOOZE_LABELS  = listOf("تأجيل متقدم ▾","ساعتان","4 ساعات","8 ساعات","يوم كامل","أسبوع")
@@ -80,6 +75,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
         loadExtras(intent)
         setupUI()
         // الصوت فقط في حالة الاختبار اليدوي
+        // المنبه الحقيقي → الصوت من القناة
         if (isTestAlarm()) {
             playAlarmSound()
         }
@@ -234,7 +230,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
                         .build()
                 )
                 setDataSource(this@AlarmOverlayActivity, soundUri)
-                isLooping = false   // ⭐ مرة واحدة فقط
+                isLooping = false
                 prepare()
                 start()
             }
