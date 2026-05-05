@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: EventAdapter
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var showingPast = false
+    private var firstResume = true
 
     private val ringtonePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
@@ -40,8 +41,7 @@ class MainActivity : AppCompatActivity() {
             val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             prefs.edit().putString(KEY_SOUND_URI, uri?.toString()).apply()
             updateSoundLabel()
-            // تنبيه: تغيير النغمة يتطلب إعادة إنشاء القناة (هي immutable بعد الإنشاء)
-            recreateAlarmChannel()
+            (application as? CalendarAlarmApplication)?.recreateAlarmChannel()
         }
     }
 
@@ -51,30 +51,37 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        // ملاحظة: القناة تنشأ الآن في CalendarAlarmApplication.onCreate
-        // لا نُنشئها هنا (كانت تنشأ بإعدادات ناقصة وتمنع تحديث القناة الصحيحة)
         setupList()
         setupSearch()
         setupTabs()
         setupPermissions()
         setupSound()
         setupTest()
-        // شغّل Service مراقبة التقويم
-        try { CalendarObserverService.start(this) } catch (_: Exception) {
-            scope.launch { withContext(Dispatchers.IO) { AlarmScheduler.rescheduleAllUpcoming(this@MainActivity) } }
-        }
+        try { CalendarObserverService.start(this) } catch (_: Exception) {}
+        rescheduleAndNotify(showAlways = true)
     }
 
-    override fun onResume() { super.onResume(); updateStatuses() }
+    override fun onResume() {
+        super.onResume()
+        updateStatuses()
+        if (!firstResume) rescheduleAndNotify(showAlways = false)
+        firstResume = false
+    }
+
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 
-    /**
-     * إعادة إنشاء قناة المنبه عند تغيير النغمة.
-     * (NotificationChannel.setSound لا يقبل التحديث بعد الإنشاء —
-     *  يجب الحذف ثم الإنشاء — والـ Application class يتولى ذلك)
-     */
-    private fun recreateAlarmChannel() {
-        (application as? CalendarAlarmApplication)?.recreateAlarmChannel()
+    private fun rescheduleAndNotify(showAlways: Boolean) {
+        scope.launch {
+            val count = withContext(Dispatchers.IO) {
+                AlarmScheduler.rescheduleAllUpcoming(this@MainActivity)
+            }
+            val msg = when {
+                count == 0 && showAlways -> "⚠️ لا توجد أحداث قادمة لجدولتها"
+                count > 0                -> "✔️ تم جدولة $count منبه قادم"
+                else                     -> null
+            }
+            msg?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show() }
+        }
     }
 
     private fun setupList() {
@@ -112,10 +119,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupTabs() {
-        val btnUp   = findViewById<Button>(R.id.btnTabUpcoming)
-        val btnPast = findViewById<Button>(R.id.btnTabPast)
-        btnUp.setOnClickListener   { showingPast = false; loadEvents() }
-        btnPast.setOnClickListener { showingPast = true;  loadEvents() }
+        findViewById<Button>(R.id.btnTabUpcoming).setOnClickListener { showingPast = false; loadEvents() }
+        findViewById<Button>(R.id.btnTabPast).setOnClickListener     { showingPast = true;  loadEvents() }
     }
 
     private fun setupPermissions() {
