@@ -10,10 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.provider.CalendarContract
 import android.view.View
-import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
@@ -23,20 +21,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * AlarmOverlayActivity = Build #20 الكامل + إصلاح واحد دقيق:
- *
- * المنهجية (من Android Developer Documentation الرسمية):
- * https://developer.android.com/develop/background-work/background-tasks/awake/screen-on
- *
- * "FLAG_KEEP_SCREEN_ON يمكن إزالته في وقت لاحق بـ clearFlags()
- *  → النظام يطفي الشاشة طبيعياً مع timeout الجوال"
- *
- * النتيجة:
- * 1. عند الإطلاق: WakeLock 60s + FLAG_KEEP_SCREEN_ON → Samsung يفتح الـ Activity بشكل صحيح
- * 2. بعد 30 ثانية: نزيل FLAG_KEEP_SCREEN_ON → الشاشة تطفي مع timeout الجوال
- * 3. الـ Activity تبقى مفتوحة في الذاكرة → لما تفتح الجوال، تشاهدها كما هي
- */
 class AlarmOverlayActivity : AppCompatActivity() {
 
     companion object {
@@ -49,15 +33,12 @@ class AlarmOverlayActivity : AppCompatActivity() {
         const val EXTRA_NOTIF_KEY   = "notif_key"
         private const val TEST_ALARM_ID = 99999L
         private const val TEST_TASK_ID  = 99998L
-        private const val SCREEN_AWAKE_DURATION_MS = 30_000L  // ⭐ 30 ثانية شاشة مضاءة
         private val SNOOZE_LABELS  = listOf("تأجيل متقدم ▾","ساعتان","4 ساعات","8 ساعات","يوم كامل","أسبوع")
         private val SNOOZE_MINUTES = listOf(0L, 120L, 240L, 480L, 1440L, 10080L)
     }
 
     private var mediaPlayer: MediaPlayer? = null
-    private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
-    private val screenOffHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
     private var title = ""
     private var desc = ""
@@ -76,75 +57,29 @@ class AlarmOverlayActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyWindowFlags()
-        acquireScreenWakeLock()
+        applyShowWhenLocked()
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
         if (isTestAlarm()) {
             playAlarmSound()
         }
-        // ⭐ الإصلاح الوحيد: بعد 30 ثانية، اسمح للشاشة بالإطفاء
-        scheduleScreenOff()
     }
 
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
     /**
-     * إعدادات Build #20 بالكامل — لم نلمس أي شيء.
+     * نهج AOSP DeskClock: APIs المعتمدة فقط (منذ Android 8.1).
+     * النظام يدير الشاشة طبيعياً → تطفي مع timeout الجوال.
+     * لا WakeLock، لا FLAG_KEEP_SCREEN_ON، لا flags deprecated.
      */
-    private fun applyWindowFlags() {
+    private fun applyShowWhenLocked() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            getSystemService(KeyguardManager::class.java).requestDismissKeyguard(this, null)
+            getSystemService(KeyguardManager::class.java)
+                .requestDismissKeyguard(this, null)
         }
-        @Suppress("DEPRECATION")
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
-    }
-
-    @Suppress("DEPRECATION")
-    private fun acquireScreenWakeLock() {
-        try {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            screenWakeLock = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
-                PowerManager.ACQUIRE_CAUSES_WAKEUP or
-                PowerManager.ON_AFTER_RELEASE,
-                "CalendarAlarm::OverlayWakeLock"
-            ).apply { acquire(60_000L) }
-        } catch (_: Exception) {}
-    }
-
-    private fun releaseScreenWakeLock() {
-        try {
-            screenWakeLock?.let { if (it.isHeld) it.release() }
-            screenWakeLock = null
-        } catch (_: Exception) {}
-    }
-
-    /**
-     * ⭐ الإصلاح الجديد المؤكد:
-     * بعد 30 ثانية، نزيل FLAG_KEEP_SCREEN_ON و WakeLock.
-     * → النظام يطفي الشاشة طبيعياً مع timeout الجوال.
-     * → الـ Activity تبقى مفتوحة في الذاكرة (لم نستدعي finish()).
-     * → لما المستخدم يفتح الجوال، يشاهد شاشة CalendarAlarm كما هي.
-     */
-    private fun scheduleScreenOff() {
-        screenOffHandler.removeCallbacksAndMessages(null)
-        screenOffHandler.postDelayed({
-            try {
-                // 1. أزل FLAG_KEEP_SCREEN_ON → النظام يقدر يطفي الشاشة
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                // 2. أفلت WakeLock
-                releaseScreenWakeLock()
-            } catch (_: Exception) {}
-        }, SCREEN_AWAKE_DURATION_MS)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -154,11 +89,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setupUI()
         stopSound()
         if (isTestAlarm()) playAlarmSound()
-        // أعد إضافة الـ flag و WakeLock للحدث الجديد
-        @Suppress("DEPRECATION")
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        acquireScreenWakeLock()
-        scheduleScreenOff()
     }
 
     private fun loadExtras(intent: Intent) {
@@ -275,18 +205,14 @@ class AlarmOverlayActivity : AppCompatActivity() {
     }
 
     private fun stopEverythingAndFinish() {
-        screenOffHandler.removeCallbacksAndMessages(null)
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
-        releaseScreenWakeLock()
         finish()
     }
 
     override fun onDestroy() {
-        screenOffHandler.removeCallbacksAndMessages(null)
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
-        releaseScreenWakeLock()
         super.onDestroy()
     }
 
