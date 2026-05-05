@@ -24,8 +24,18 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * AlarmOverlayActivity — نسخة Build #20 الشغّالة + إصلاح واحد:
- * الشاشة تستيقظ لحظياً ثم تطفي مع timeout الجوال (لا تبقى مضاءة 60 ثانية).
+ * AlarmOverlayActivity = نسخة Build #20 + إصلاحان:
+ *
+ * 1. WakeLock 15 ثانية بدل 60 → الشاشة تطفي مع timeout الجوال
+ * 2. لا finish() تلقائي → الـ Activity تبقى مفتوحة في الذاكرة
+ *
+ * النتيجة:
+ * - المنبه يطلق → الشاشة تستيقظ → الصوت يطلق
+ * - بعد 15 ثانية: WakeLock يفلت
+ * - Samsung timeout (30 ثانية) يبدأ
+ * - الشاشة تطفي
+ * - الـ Activity تبقى مفتوحة (مثل المنبه الافتراضي)
+ * - لما تفتح الجوال → تشاهد شاشة CalendarAlarm كما هي
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -44,6 +54,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     }
 
     private var mediaPlayer: MediaPlayer? = null
+    private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
     private var title = ""
@@ -64,7 +75,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyWindowFlags()
-        wakeScreenBriefly()
+        acquireScreenWakeLock()
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
@@ -76,7 +87,9 @@ class AlarmOverlayActivity : AppCompatActivity() {
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
     /**
-     * نفس إعدادات Build #20 بالضبط — لا تغيير في البصمة أو lock screen.
+     * إعدادات Build #20 بالضبط — مع تغيير واحد:
+     * ❌ تم حذف FLAG_KEEP_SCREEN_ON
+     * هذا يخلي الشاشة تطفي مع timeout الجوال طبيعياً.
      */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -89,29 +102,31 @@ class AlarmOverlayActivity : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            // ⭐ تم حذف FLAG_KEEP_SCREEN_ON فقط — الشاشة تطفي مع timeout النظام
         )
     }
 
     /**
-     * ⭐ التغيير الوحيد عن Build #20:
-     * إيقاظ الشاشة لحظياً (3 ثواني فقط) ثم نتركها لـ timeout الجوال.
-     * في Build #20 كانت 60 ثانية = الشاشة مضاءة 60 ثانية كاملة.
+     * WakeLock 15 ثانية فقط — كافي للاستيقاظ.
+     * بعد 15 ثانية يفلت → timeout الجوال يتولى الأمر.
+     * Samsung One UI 8 يقبل 15 ثانية كـ "Activity حرجة".
      */
     @Suppress("DEPRECATION")
-    private fun wakeScreenBriefly() {
+    private fun acquireScreenWakeLock() {
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
-            val wl = pm.newWakeLock(
+            screenWakeLock = pm.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
-                "CalendarAlarm::BriefWake"
-            )
-            wl.acquire(3_000L)  // ⭐ 3 ثوان للاستيقاظ فقط
-            Handler(Looper.getMainLooper()).postDelayed({
-                try { if (wl.isHeld) wl.release() } catch (_: Exception) {}
-            }, 1500L)
+                "CalendarAlarm::OverlayWakeLock"
+            ).apply { acquire(15_000L) }  // ⭐ 15 ثانية بدل 60
+        } catch (_: Exception) {}
+    }
+
+    private fun releaseScreenWakeLock() {
+        try {
+            screenWakeLock?.let { if (it.isHeld) it.release() }
+            screenWakeLock = null
         } catch (_: Exception) {}
     }
 
@@ -240,12 +255,14 @@ class AlarmOverlayActivity : AppCompatActivity() {
     private fun stopEverythingAndFinish() {
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
+        releaseScreenWakeLock()
         finish()
     }
 
     override fun onDestroy() {
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
+        releaseScreenWakeLock()
         super.onDestroy()
     }
 
