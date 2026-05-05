@@ -22,17 +22,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
- *
- * ━━━ التغيير في هذا الإصدار ━━━
- * تم حذف requestDismissKeyguard() — كانت تطلب البصمة على سامسونج.
- * الآن: التطبيق يظهر فوق lock screen مباشرة بدون طلب بصمة.
- *
- * الصوت:
- * - المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
- * - الاختبار اليدوي → الصوت من MediaPlayer (مرة وحدة)
- */
 class AlarmOverlayActivity : AppCompatActivity() {
 
     companion object {
@@ -82,22 +71,16 @@ class AlarmOverlayActivity : AppCompatActivity() {
 
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
-    /**
-     * إعداد النافذة لتظهر فوق lock screen.
-     * ⭐ تم حذف requestDismissKeyguard() — كانت تطلب البصمة.
-     */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)   // ⭐ يظهر فوق lock screen
-            setTurnScreenOn(true)     // ⭐ يستيقظ الشاشة
-            // ❌ تم حذف: getSystemService(KeyguardManager::class.java).requestDismissKeyguard(...)
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
         }
         @Suppress("DEPRECATION")
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            // ❌ تم حذف: FLAG_DISMISS_KEYGUARD
         )
     }
 
