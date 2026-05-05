@@ -11,7 +11,6 @@ import android.os.PowerManager
 class EventAlarmReceiver : BroadcastReceiver() {
 
     companion object {
-        val CHANNEL_ID get() = CalendarAlarmApplication.CHANNEL_ID_ALARM_V4
         const val NOTIF_ID_BASE = 9000
     }
 
@@ -55,7 +54,7 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            val notification = Notification.Builder(context, CHANNEL_ID)
+            val notification = Notification.Builder(context, CalendarAlarmApplication.CHANNEL_ID_ALARM_V4)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)
                 .setContentText(if (isTask) "✅ مهمة" else "📅 تقويم")
@@ -69,8 +68,6 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 .setShowWhen(true)
                 .setWhen(startTime)
                 .build()
-
-            // ⭐ لا FLAG_INSISTENT — يمنع تكرار النغمة من النظام
 
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.notify(NOTIF_ID_BASE + eventId.toInt(), notification)
