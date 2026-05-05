@@ -1,6 +1,5 @@
 package com.alaimtiaz.calendaralarm
 
-import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Intent
 import android.media.AudioAttributes
@@ -26,11 +25,13 @@ import java.util.Locale
 /**
  * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
  *
- * ━━━ الإصلاح الأخير ━━━
- * المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
- * الاختبار اليدوي → الصوت من MediaPlayer (مرة وحدة)
+ * ━━━ التغيير في هذا الإصدار ━━━
+ * تم حذف requestDismissKeyguard() — كانت تطلب البصمة على سامسونج.
+ * الآن: التطبيق يظهر فوق lock screen مباشرة بدون طلب بصمة.
  *
- * النتيجة: صوت واحد فقط في كل الحالات.
+ * الصوت:
+ * - المنبه الحقيقي → الصوت من القناة فقط (لا MediaPlayer)
+ * - الاختبار اليدوي → الصوت من MediaPlayer (مرة وحدة)
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -74,8 +75,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
-        // الصوت فقط في حالة الاختبار اليدوي
-        // المنبه الحقيقي → الصوت من القناة
         if (isTestAlarm()) {
             playAlarmSound()
         }
@@ -83,18 +82,22 @@ class AlarmOverlayActivity : AppCompatActivity() {
 
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
+    /**
+     * إعداد النافذة لتظهر فوق lock screen.
+     * ⭐ تم حذف requestDismissKeyguard() — كانت تطلب البصمة.
+     */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-            getSystemService(KeyguardManager::class.java).requestDismissKeyguard(this, null)
+            setShowWhenLocked(true)   // ⭐ يظهر فوق lock screen
+            setTurnScreenOn(true)     // ⭐ يستيقظ الشاشة
+            // ❌ تم حذف: getSystemService(KeyguardManager::class.java).requestDismissKeyguard(...)
         }
         @Suppress("DEPRECATION")
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            // ❌ تم حذف: FLAG_DISMISS_KEYGUARD
         )
     }
 
@@ -214,9 +217,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * تشغيل النغمة (للاختبار اليدوي فقط) — مرة واحدة فقط.
-     */
     private fun playAlarmSound() {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE)
         val soundUri = prefs.getString(MainActivity.KEY_SOUND_URI, null)?.let { Uri.parse(it) }
