@@ -11,7 +11,6 @@ import android.os.PowerManager
 class EventAlarmReceiver : BroadcastReceiver() {
 
     companion object {
-        // ⭐ القناة v4 الجديدة — صامتة
         val CHANNEL_ID get() = CalendarAlarmApplication.CHANNEL_ID_ALARM_V4
         const val NOTIF_ID_BASE = 9000
     }
@@ -71,8 +70,7 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 .setWhen(startTime)
                 .build()
 
-            // ⭐ ما نضيف FLAG_INSISTENT — يخلي القناة تعيد الصوت بدون توقف
-            // الصوت يُشغّل مرة واحدة من AlarmOverlayActivity
+            // ⭐ لا FLAG_INSISTENT — يمنع تكرار النغمة من النظام
 
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.notify(NOTIF_ID_BASE + eventId.toInt(), notification)
