@@ -1,5 +1,6 @@
 package com.alaimtiaz.calendaralarm
 
+import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Intent
 import android.media.AudioAttributes
@@ -23,15 +24,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
- *
- * ━━━ الإصلاحات في هذا الإصدار ━━━
- * 1. يظهر فوق lock screen بدون طلب بصمة (setShowWhenLocked)
- * 2. الصوت من القناة فقط (لا تكرار، لا دبل)
- * 3. ⭐ الشاشة تطفي طبيعياً مع timeout النظام (لا WakeLock طويل)
- *    - يستيقظ الجوال لحظياً
- *    - يبقى مضاء حسب إعداد screen timeout (15-30 ثانية)
- *    - يطفي تلقائياً → توفير بطارية
+ * AlarmOverlayActivity — نسخة Build #20 الشغّالة + إصلاح واحد:
+ * الشاشة تستيقظ لحظياً ثم تطفي مع timeout الجوال (لا تبقى مضاءة 60 ثانية).
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -82,27 +76,27 @@ class AlarmOverlayActivity : AppCompatActivity() {
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
     /**
-     * إعداد النافذة:
-     * - تظهر فوق lock screen
-     * - تستيقظ الشاشة لحظياً
-     * - ⭐ بدون FLAG_KEEP_SCREEN_ON — الشاشة تطفي مع timeout النظام
+     * نفس إعدادات Build #20 بالضبط — لا تغيير في البصمة أو lock screen.
      */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+            getSystemService(KeyguardManager::class.java).requestDismissKeyguard(this, null)
         }
         @Suppress("DEPRECATION")
         window.addFlags(
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            // ❌ تم حذف FLAG_KEEP_SCREEN_ON — الشاشة تطفي طبيعياً
+            // ⭐ تم حذف FLAG_KEEP_SCREEN_ON فقط — الشاشة تطفي مع timeout النظام
         )
     }
 
     /**
-     * إيقاظ الشاشة لحظياً فقط (10 ثواني كحد أقصى).
-     * بعدها timeout النظام يتولى الأمر.
+     * ⭐ التغيير الوحيد عن Build #20:
+     * إيقاظ الشاشة لحظياً (3 ثواني فقط) ثم نتركها لـ timeout الجوال.
+     * في Build #20 كانت 60 ثانية = الشاشة مضاءة 60 ثانية كاملة.
      */
     @Suppress("DEPRECATION")
     private fun wakeScreenBriefly() {
@@ -114,11 +108,10 @@ class AlarmOverlayActivity : AppCompatActivity() {
                 PowerManager.ON_AFTER_RELEASE,
                 "CalendarAlarm::BriefWake"
             )
-            wl.acquire(10_000L)  // ⭐ 10 ثوان فقط للاستيقاظ
-            // نفلتها بعد ثانيتين عشان تنطفي مع timeout الجوال
+            wl.acquire(3_000L)  // ⭐ 3 ثوان للاستيقاظ فقط
             Handler(Looper.getMainLooper()).postDelayed({
                 try { if (wl.isHeld) wl.release() } catch (_: Exception) {}
-            }, 2000L)
+            }, 1500L)
         } catch (_: Exception) {}
     }
 
