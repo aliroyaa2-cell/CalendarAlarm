@@ -3,9 +3,6 @@ package com.alaimtiaz.calendaralarm
 import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioManager
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +21,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
+ * الصوت يأتي من القناة (NotificationChannel) وليس من هنا.
+ * هذا يضمن صوت واحد فقط بدون تكرار.
+ */
 class AlarmOverlayActivity : AppCompatActivity() {
 
     companion object {
@@ -38,7 +40,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         private val SNOOZE_MINUTES = listOf(0L, 120L, 240L, 480L, 1440L, 10080L)
     }
 
-    private var mediaPlayer: MediaPlayer? = null
     private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
@@ -64,7 +65,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
-        playAlarmSound()
     }
 
     private fun applyWindowFlags() {
@@ -107,8 +107,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setIntent(intent)
         loadExtras(intent)
         setupUI()
-        stopSound()
-        playAlarmSound()
     }
 
     private fun loadExtras(intent: Intent) {
@@ -198,44 +196,17 @@ class AlarmOverlayActivity : AppCompatActivity() {
         }
     }
 
-    private fun playAlarmSound() {
-        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE)
-        val soundUri = prefs.getString(MainActivity.KEY_SOUND_URI, null)?.let { Uri.parse(it) }
-            ?: android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
-        try {
-            mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                setDataSource(this@AlarmOverlayActivity, soundUri)
-                isLooping = false
-                prepare()
-                start()
-            }
-            val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            am.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
-        } catch (_: Exception) {}
-    }
-
-    private fun stopSound() {
-        try { mediaPlayer?.stop() } catch (_: Exception) {}
-        try { mediaPlayer?.release() } catch (_: Exception) {}
-        mediaPlayer = null
-    }
-
     private fun stopEverythingAndFinish() {
-        stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
+        try {
+            getSystemService(NotificationManager::class.java)
+                .cancel(EventAlarmReceiver.NOTIF_ID_BASE + eventId.toInt())
+        } catch (_: Exception) {}
         finish()
     }
 
     override fun onDestroy() {
-        stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
         super.onDestroy()
