@@ -54,7 +54,7 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            val notification = Notification.Builder(context, CalendarAlarmApplication.CHANNEL_ID_ALARM_V4)
+            val notification = Notification.Builder(context, CalendarAlarmApplication.CHANNEL_ID_ALARM_V5)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)
                 .setContentText(if (isTask) "✅ مهمة" else "📅 تقويم")
