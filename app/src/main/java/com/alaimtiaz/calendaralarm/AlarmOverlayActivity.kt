@@ -22,6 +22,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * AlarmOverlayActivity — الشاشة المنبثقة عند المنبه.
+ *
+ * ━━━ الإصلاحات في هذا الإصدار ━━━
+ * 1. يظهر فوق lock screen بدون طلب بصمة (setShowWhenLocked)
+ * 2. الصوت من القناة فقط (لا تكرار، لا دبل)
+ * 3. ⭐ الشاشة تطفي طبيعياً مع timeout النظام (لا WakeLock طويل)
+ *    - يستيقظ الجوال لحظياً
+ *    - يبقى مضاء حسب إعداد screen timeout (15-30 ثانية)
+ *    - يطفي تلقائياً → توفير بطارية
+ */
 class AlarmOverlayActivity : AppCompatActivity() {
 
     companion object {
@@ -39,7 +50,6 @@ class AlarmOverlayActivity : AppCompatActivity() {
     }
 
     private var mediaPlayer: MediaPlayer? = null
-    private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
     private var title = ""
@@ -60,7 +70,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyWindowFlags()
-        acquireScreenWakeLock()
+        wakeScreenBriefly()
         setContentView(R.layout.activity_alarm_overlay)
         loadExtras(intent)
         setupUI()
@@ -71,6 +81,12 @@ class AlarmOverlayActivity : AppCompatActivity() {
 
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
+    /**
+     * إعداد النافذة:
+     * - تظهر فوق lock screen
+     * - تستيقظ الشاشة لحظياً
+     * - ⭐ بدون FLAG_KEEP_SCREEN_ON — الشاشة تطفي مع timeout النظام
+     */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -78,29 +94,31 @@ class AlarmOverlayActivity : AppCompatActivity() {
         }
         @Suppress("DEPRECATION")
         window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            // ❌ تم حذف FLAG_KEEP_SCREEN_ON — الشاشة تطفي طبيعياً
         )
     }
 
+    /**
+     * إيقاظ الشاشة لحظياً فقط (10 ثواني كحد أقصى).
+     * بعدها timeout النظام يتولى الأمر.
+     */
     @Suppress("DEPRECATION")
-    private fun acquireScreenWakeLock() {
+    private fun wakeScreenBriefly() {
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
-            screenWakeLock = pm.newWakeLock(
+            val wl = pm.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
-                "CalendarAlarm::OverlayWakeLock"
-            ).apply { acquire(60_000L) }
-        } catch (_: Exception) {}
-    }
-
-    private fun releaseScreenWakeLock() {
-        try {
-            screenWakeLock?.let { if (it.isHeld) it.release() }
-            screenWakeLock = null
+                "CalendarAlarm::BriefWake"
+            )
+            wl.acquire(10_000L)  // ⭐ 10 ثوان فقط للاستيقاظ
+            // نفلتها بعد ثانيتين عشان تنطفي مع timeout الجوال
+            Handler(Looper.getMainLooper()).postDelayed({
+                try { if (wl.isHeld) wl.release() } catch (_: Exception) {}
+            }, 2000L)
         } catch (_: Exception) {}
     }
 
@@ -229,14 +247,12 @@ class AlarmOverlayActivity : AppCompatActivity() {
     private fun stopEverythingAndFinish() {
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
-        releaseScreenWakeLock()
         finish()
     }
 
     override fun onDestroy() {
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
-        releaseScreenWakeLock()
         super.onDestroy()
     }
 
