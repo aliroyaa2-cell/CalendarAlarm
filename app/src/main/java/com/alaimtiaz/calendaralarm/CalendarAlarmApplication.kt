@@ -6,14 +6,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 
-/**
- * Application class.
- *
- * ━━━ التحديث المهم ━━━
- * القناة v4 الجديدة: بدون setSound() بشكل صريح.
- * السبب: AlarmOverlayActivity تتولى الصوت بنفسها (نغمة المستخدم المختارة).
- * هذا يمنع تكرار النغمتين معاً.
- */
 class CalendarAlarmApplication : Application() {
 
     override fun onCreate() {
@@ -30,7 +22,7 @@ class CalendarAlarmApplication : Application() {
         listOf(
             "calendar_alarm_channel",
             "calendar_alarm_channel_v2",
-            "calendar_alarm_channel_v3",   // ⭐ القناة السابقة (كان فيها صوت — نحذفها)
+            "calendar_alarm_channel_v3",
             "alarm_service_channel",
             "observer_channel"
         ).forEach { oldId ->
@@ -38,9 +30,6 @@ class CalendarAlarmApplication : Application() {
         }
     }
 
-    /**
-     * قناة المنبه v4 — صامتة (الصوت يُشغّل من AlarmOverlayActivity).
-     */
     private fun createAlarmChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID_ALARM_V4) != null) return
@@ -51,12 +40,9 @@ class CalendarAlarmApplication : Application() {
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "تنبيهات شاشة كاملة لأحداث التقويم"
-            // ⭐ لا نضع setSound — القناة صامتة
-            // الصوت سيُشغّل من AlarmOverlayActivity فقط (نغمة المستخدم المختارة)
             setSound(null, null)
             setBypassDnd(true)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            // الاهتزاز أيضاً يأتي من AlarmOverlayActivity
             enableVibration(false)
             enableLights(true)
             lightColor = 0xFF5B6EF5.toInt()
@@ -87,13 +73,7 @@ class CalendarAlarmApplication : Application() {
     }
 
     companion object {
-        // قناة v4 — صامتة (الصوت من AlarmOverlayActivity)
         const val CHANNEL_ID_ALARM_V4 = "calendar_alarm_channel_v4"
-        // قناة Observer
         const val CHANNEL_ID_OBSERVER = "observer_channel_v2"
-
-        // اسم بديل قديم — احتياط للـ references القديمة
-        @Deprecated("Use CHANNEL_ID_ALARM_V4 instead", ReplaceWith("CHANNEL_ID_ALARM_V4"))
-        const val CHANNEL_ID_ALARM_V3 = CHANNEL_ID_ALARM_V4
     }
 }
