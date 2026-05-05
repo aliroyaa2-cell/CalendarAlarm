@@ -24,18 +24,18 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * AlarmOverlayActivity = نسخة Build #20 + إصلاحان:
+ * AlarmOverlayActivity = Build #20 الكامل + إصلاح واحد دقيق:
  *
- * 1. WakeLock 15 ثانية بدل 60 → الشاشة تطفي مع timeout الجوال
- * 2. لا finish() تلقائي → الـ Activity تبقى مفتوحة في الذاكرة
+ * المنهجية (من Android Developer Documentation الرسمية):
+ * https://developer.android.com/develop/background-work/background-tasks/awake/screen-on
+ *
+ * "FLAG_KEEP_SCREEN_ON يمكن إزالته في وقت لاحق بـ clearFlags()
+ *  → النظام يطفي الشاشة طبيعياً مع timeout الجوال"
  *
  * النتيجة:
- * - المنبه يطلق → الشاشة تستيقظ → الصوت يطلق
- * - بعد 15 ثانية: WakeLock يفلت
- * - Samsung timeout (30 ثانية) يبدأ
- * - الشاشة تطفي
- * - الـ Activity تبقى مفتوحة (مثل المنبه الافتراضي)
- * - لما تفتح الجوال → تشاهد شاشة CalendarAlarm كما هي
+ * 1. عند الإطلاق: WakeLock 60s + FLAG_KEEP_SCREEN_ON → Samsung يفتح الـ Activity بشكل صحيح
+ * 2. بعد 30 ثانية: نزيل FLAG_KEEP_SCREEN_ON → الشاشة تطفي مع timeout الجوال
+ * 3. الـ Activity تبقى مفتوحة في الذاكرة → لما تفتح الجوال، تشاهدها كما هي
  */
 class AlarmOverlayActivity : AppCompatActivity() {
 
@@ -49,6 +49,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
         const val EXTRA_NOTIF_KEY   = "notif_key"
         private const val TEST_ALARM_ID = 99999L
         private const val TEST_TASK_ID  = 99998L
+        private const val SCREEN_AWAKE_DURATION_MS = 30_000L  // ⭐ 30 ثانية شاشة مضاءة
         private val SNOOZE_LABELS  = listOf("تأجيل متقدم ▾","ساعتان","4 ساعات","8 ساعات","يوم كامل","أسبوع")
         private val SNOOZE_MINUTES = listOf(0L, 120L, 240L, 480L, 1440L, 10080L)
     }
@@ -56,6 +57,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var screenWakeLock: PowerManager.WakeLock? = null
     private val clockHandler = Handler(Looper.getMainLooper())
+    private val screenOffHandler = Handler(Looper.getMainLooper())
     private var eventId = -1L
     private var title = ""
     private var desc = ""
@@ -82,14 +84,14 @@ class AlarmOverlayActivity : AppCompatActivity() {
         if (isTestAlarm()) {
             playAlarmSound()
         }
+        // ⭐ الإصلاح الوحيد: بعد 30 ثانية، اسمح للشاشة بالإطفاء
+        scheduleScreenOff()
     }
 
     private fun isTestAlarm(): Boolean = eventId == TEST_ALARM_ID || eventId == TEST_TASK_ID
 
     /**
-     * إعدادات Build #20 بالضبط — مع تغيير واحد:
-     * ❌ تم حذف FLAG_KEEP_SCREEN_ON
-     * هذا يخلي الشاشة تطفي مع timeout الجوال طبيعياً.
+     * إعدادات Build #20 بالكامل — لم نلمس أي شيء.
      */
     private fun applyWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -99,17 +101,13 @@ class AlarmOverlayActivity : AppCompatActivity() {
         }
         @Suppress("DEPRECATION")
         window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
             WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
     }
 
-    /**
-     * WakeLock 15 ثانية فقط — كافي للاستيقاظ.
-     * بعد 15 ثانية يفلت → timeout الجوال يتولى الأمر.
-     * Samsung One UI 8 يقبل 15 ثانية كـ "Activity حرجة".
-     */
     @Suppress("DEPRECATION")
     private fun acquireScreenWakeLock() {
         try {
@@ -119,7 +117,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
                 "CalendarAlarm::OverlayWakeLock"
-            ).apply { acquire(15_000L) }  // ⭐ 15 ثانية بدل 60
+            ).apply { acquire(60_000L) }
         } catch (_: Exception) {}
     }
 
@@ -130,6 +128,25 @@ class AlarmOverlayActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
+    /**
+     * ⭐ الإصلاح الجديد المؤكد:
+     * بعد 30 ثانية، نزيل FLAG_KEEP_SCREEN_ON و WakeLock.
+     * → النظام يطفي الشاشة طبيعياً مع timeout الجوال.
+     * → الـ Activity تبقى مفتوحة في الذاكرة (لم نستدعي finish()).
+     * → لما المستخدم يفتح الجوال، يشاهد شاشة CalendarAlarm كما هي.
+     */
+    private fun scheduleScreenOff() {
+        screenOffHandler.removeCallbacksAndMessages(null)
+        screenOffHandler.postDelayed({
+            try {
+                // 1. أزل FLAG_KEEP_SCREEN_ON → النظام يقدر يطفي الشاشة
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                // 2. أفلت WakeLock
+                releaseScreenWakeLock()
+            } catch (_: Exception) {}
+        }, SCREEN_AWAKE_DURATION_MS)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -137,6 +154,11 @@ class AlarmOverlayActivity : AppCompatActivity() {
         setupUI()
         stopSound()
         if (isTestAlarm()) playAlarmSound()
+        // أعد إضافة الـ flag و WakeLock للحدث الجديد
+        @Suppress("DEPRECATION")
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        acquireScreenWakeLock()
+        scheduleScreenOff()
     }
 
     private fun loadExtras(intent: Intent) {
@@ -253,6 +275,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     }
 
     private fun stopEverythingAndFinish() {
+        screenOffHandler.removeCallbacksAndMessages(null)
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
@@ -260,6 +283,7 @@ class AlarmOverlayActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        screenOffHandler.removeCallbacksAndMessages(null)
         stopSound()
         clockHandler.removeCallbacksAndMessages(null)
         releaseScreenWakeLock()
