@@ -1,6 +1,7 @@
 package com.alaimtiaz.calendaralarm
 
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -11,6 +12,7 @@ import android.os.PowerManager
 class EventAlarmReceiver : BroadcastReceiver() {
 
     companion object {
+        const val CHANNEL_ID = "calendar_alarm_channel"
         const val NOTIF_ID_BASE = 9000
     }
 
@@ -29,13 +31,12 @@ class EventAlarmReceiver : BroadcastReceiver() {
         wl.acquire(10_000L)
 
         try {
+            ensureChannel(context)
+
             val overlayIntent = Intent(context, AlarmOverlayActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_NO_USER_ACTION
-                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                         Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra(AlarmOverlayActivity.EXTRA_EVENT_ID,    eventId)
                 putExtra(AlarmOverlayActivity.EXTRA_TITLE,       title)
                 putExtra(AlarmOverlayActivity.EXTRA_DESCRIPTION, description)
@@ -49,30 +50,34 @@ class EventAlarmReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            val contentPi = PendingIntent.getActivity(
-                context, eventId.toInt() + 100_000, overlayIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            val notification = Notification.Builder(context, CalendarAlarmApplication.CHANNEL_ID_ALARM_V5)
+            val notification = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)
                 .setContentText(if (isTask) "✅ مهمة" else "📅 تقويم")
                 .setCategory(Notification.CATEGORY_ALARM)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setPriority(Notification.PRIORITY_MAX)
                 .setFullScreenIntent(fullScreenPi, true)
-                .setContentIntent(contentPi)
-                .setAutoCancel(false)
-                .setOngoing(true)
-                .setShowWhen(true)
-                .setWhen(startTime)
+                .setAutoCancel(true)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .build()
 
-            val nm = context.getSystemService(NotificationManager::class.java)
-            nm.notify(NOTIF_ID_BASE + eventId.toInt(), notification)
+            // ⭐ لا نضع FLAG_INSISTENT — يخلي الصوت يشتغل مرة واحدة فقط
+
+            context.getSystemService(NotificationManager::class.java)
+                .notify(NOTIF_ID_BASE + eventId.toInt(), notification)
         } finally {
             if (wl.isHeld) wl.release()
         }
+    }
+
+    private fun ensureChannel(context: Context) {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        NotificationChannel(CHANNEL_ID, "منبّه التقويم", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "تنبيهات شاشة كاملة لأحداث التقويم"
+            enableVibration(true)
+            setBypassDnd(true)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }.also { nm.createNotificationChannel(it) }
     }
 }
