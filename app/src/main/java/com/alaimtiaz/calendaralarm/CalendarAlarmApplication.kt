@@ -81,4 +81,19 @@ class CalendarAlarmApplication : Application() {
 
     fun recreateAlarmChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = getSystem
+        val nm = getSystemService(NotificationManager::class.java)
+        try { nm.deleteNotificationChannel(CHANNEL_ID_ALARM_V4) } catch (_: Exception) {}
+        createAlarmChannel()
+    }
+
+    companion object {
+        // قناة v4 — صامتة (الصوت من AlarmOverlayActivity)
+        const val CHANNEL_ID_ALARM_V4 = "calendar_alarm_channel_v4"
+        // قناة Observer
+        const val CHANNEL_ID_OBSERVER = "observer_channel_v2"
+
+        // اسم بديل قديم — احتياط للـ references القديمة
+        @Deprecated("Use CHANNEL_ID_ALARM_V4 instead", ReplaceWith("CHANNEL_ID_ALARM_V4"))
+        const val CHANNEL_ID_ALARM_V3 = CHANNEL_ID_ALARM_V4
+    }
+}
